@@ -35,14 +35,76 @@ function getAuthHeaders(): Record<string, string> {
   };
 }
 
-export async function fetchDB(): Promise<DatabaseState> {
-  const res = await fetch(`${API_BASE}/db`);
-  if (!res.ok) {
-    const errText = await res.text().catch(() => "");
-    throw new Error(`Failed to load ShareTour database (${res.status}): ${errText || res.statusText}`);
+export async function fetchDB(retries = 3, initialDelayMs = 1000): Promise<DatabaseState> {
+  let attempt = 0;
+  let lastError: any = null;
+
+  while (attempt <= retries) {
+    try {
+      const res = await fetch(`${API_BASE}/db`);
+      if (!res.ok) {
+        if (res.status === 502 || res.status === 503 || res.status === 504) {
+          throw new Error(`Server starting up (${res.status})`);
+        }
+        const errText = await res.text().catch(() => "");
+        throw new Error(`Failed to load ShareTour database (${res.status}): ${errText || res.statusText}`);
+      }
+      const db: DatabaseState = await res.json();
+      return db;
+    } catch (err: any) {
+      lastError = err;
+      if (attempt < retries) {
+        const delay = initialDelayMs * Math.pow(1.5, attempt);
+        await new Promise((resolve) => setTimeout(resolve, delay));
+        attempt++;
+      } else {
+        break;
+      }
+    }
   }
-  const db: DatabaseState = await res.json();
-  return db;
+
+  throw lastError || new Error("Failed to connect to ShareTour server database.");
+}
+
+export async function fetchTrips(retries = 2): Promise<Trip[]> {
+  let attempt = 0;
+  while (attempt <= retries) {
+    try {
+      const res = await fetch(`${API_BASE}/trips`);
+      if (res.ok) {
+        const data = await res.json();
+        return Array.isArray(data) ? data : [];
+      }
+    } catch {
+      // transient network failure, retry
+    }
+    attempt++;
+    if (attempt <= retries) {
+      await new Promise((resolve) => setTimeout(resolve, 1000 * attempt));
+    }
+  }
+  return [];
+}
+
+export async function fetchBatches(tripId?: string, retries = 2): Promise<Batch[]> {
+  let attempt = 0;
+  const url = tripId ? `${API_BASE}/batches?tripId=${encodeURIComponent(tripId)}` : `${API_BASE}/batches`;
+  while (attempt <= retries) {
+    try {
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = await res.json();
+        return Array.isArray(data) ? data : [];
+      }
+    } catch {
+      // transient network failure, retry
+    }
+    attempt++;
+    if (attempt <= retries) {
+      await new Promise((resolve) => setTimeout(resolve, 1000 * attempt));
+    }
+  }
+  return [];
 }
 
 export async function createTrip(trip: Omit<Trip, "id">): Promise<Trip> {

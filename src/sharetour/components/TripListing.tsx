@@ -268,14 +268,26 @@ export default function TripListing({ trips, batches, onSelectTrip, onNavigateTo
               );
             })
           ) : (
-            <div className="col-span-full bg-gray-50/50 p-12 text-center rounded-2xl border border-dashed border-gray-200">
-              <p className="text-gray-500 text-sm font-sans">{t("No vacations or trips found matching your current search parameters.")}</p>
-              <button
-                onClick={() => { setSearchQuery(""); setSelectedDuration("all"); setSelectedExperience("all"); }}
-                className="mt-4 inline-flex items-center space-x-1 text-xs text-[#315B4F] font-bold underline cursor-pointer hover:text-[#203c34] font-sans"
-              >
-                {t("Reset Search Filters")}
-              </button>
+            <div className="col-span-full bg-white p-12 sm:p-16 text-center rounded-2xl border border-dashed border-gray-200 shadow-sm space-y-3" id="trip-empty-state">
+              <div className="w-12 h-12 rounded-full bg-[#315B4F]/10 text-[#315B4F] flex items-center justify-center mx-auto mb-2">
+                <Sparkles className="w-6 h-6 text-[#D6B16D]" />
+              </div>
+              <h3 className="font-display font-bold text-gray-900 text-base sm:text-lg">
+                {trips.length === 0 ? t("Belum Ada Open Trip Tersedia") : t("Tidak Ada Trip yang Cocok")}
+              </h3>
+              <p className="text-gray-500 text-xs sm:text-sm font-sans max-w-md mx-auto leading-relaxed">
+                {trips.length === 0
+                  ? t("Jadwal Open Trip periode berikutnya sedang dipersiapkan. Silakan hubungi admin atau periksa kembali secara berkala.")
+                  : t("No vacations or trips found matching your current search parameters.")}
+              </p>
+              {trips.length > 0 && (
+                <button
+                  onClick={() => { setSearchQuery(""); setSelectedDuration("all"); setSelectedExperience("all"); }}
+                  className="mt-3 inline-flex items-center space-x-1 text-xs text-[#315B4F] font-bold underline cursor-pointer hover:text-[#203c34] font-sans"
+                >
+                  {t("Reset Search Filters")}
+                </button>
+              )}
             </div>
           )}
         </div>

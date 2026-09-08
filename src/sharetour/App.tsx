@@ -31,21 +31,50 @@ export default function App() {
 
   // Database Loader State
   const [loading, setLoading] = useState(true);
+  const [retryCount, setRetryCount] = useState(0);
   const [errorMsg, setErrorMsg] = useState("");
 
-  const refreshDatabase = async () => {
-    try {
-      const db = await fetchDB();
-      setTrips(db.trips || []);
-      setBatches(db.batches || []);
-      setBookings(db.bookings || []);
+  const refreshDatabase = async (isManual = false) => {
+    if (isManual) {
+      setLoading(true);
       setErrorMsg("");
-    } catch (err: any) {
-      console.error("Database sync error:", err);
-      setErrorMsg(err.message || "Failed to connect to ShareTour server database.");
-    } finally {
-      setLoading(false);
+      setRetryCount(0);
     }
+
+    const maxRetries = 3;
+    let attempt = 0;
+    let lastErr: any = null;
+
+    while (attempt <= maxRetries) {
+      try {
+        if (attempt > 0) {
+          setRetryCount(attempt);
+        }
+        // Attempt fetch
+        const db = await fetchDB(0);
+        setTrips(Array.isArray(db.trips) ? db.trips : []);
+        setBatches(Array.isArray(db.batches) ? db.batches : []);
+        setBookings(Array.isArray(db.bookings) ? db.bookings : []);
+        setErrorMsg("");
+        setLoading(false);
+        setRetryCount(0);
+        return;
+      } catch (err: any) {
+        lastErr = err;
+        attempt++;
+        if (attempt <= maxRetries) {
+          setRetryCount(attempt);
+          const delay = attempt * 1200; // 1.2s, 2.4s, 3.6s
+          console.warn(`[ShareTour DB Sync] Attempt ${attempt}/${maxRetries} failed, retrying in ${delay}ms...`, err);
+          await new Promise((resolve) => setTimeout(resolve, delay));
+        }
+      }
+    }
+
+    console.error("Database sync final failure:", lastErr);
+    setErrorMsg(lastErr?.message || "Failed to connect to ShareTour server database.");
+    setLoading(false);
+    setRetryCount(0);
   };
 
   useEffect(() => {
@@ -118,15 +147,19 @@ export default function App() {
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20 space-y-4" id="db-loading-spinner">
             <RefreshCw className="w-10 h-10 text-[#315B4F] animate-spin" />
-            <p className="text-sm font-sans font-medium text-gray-500">Synchronizing Smart Journey Open Trips Database...</p>
+            <p className="text-sm font-sans font-medium text-gray-600">
+              {retryCount > 0
+                ? `Menghubungkan ke database Share Tour (Percobaan ${retryCount}/3)...`
+                : "Synchronizing Smart Journey Open Trips Database..."}
+            </p>
           </div>
         ) : errorMsg ? (
           <div className="max-w-md mx-auto bg-rose-50 border border-rose-100 p-8 rounded-2xl text-center shadow-lg space-y-4 my-10" id="db-error-panel">
             <h1 className="font-display font-bold text-rose-800 text-lg">Database Connection Error</h1>
             <p className="text-xs text-rose-700 leading-relaxed font-sans">{errorMsg}</p>
             <button
-              onClick={() => { setLoading(true); refreshDatabase(); }}
-              className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-semibold rounded-lg text-xs"
+              onClick={() => { refreshDatabase(true); }}
+              className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-semibold rounded-lg text-xs transition-colors cursor-pointer"
             >
               Retry Connection
             </button>

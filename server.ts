@@ -759,6 +759,28 @@ app.get('/api/db', (req, res) => {
   }
 });
 
+app.get('/api/trips', (req, res) => {
+  try {
+    const db = readDB();
+    res.json(Array.isArray(db.trips) ? db.trips : []);
+  } catch {
+    res.status(500).json({ error: 'Failed to fetch trips' });
+  }
+});
+
+app.get('/api/trips/:id', (req, res) => {
+  try {
+    const db = readDB();
+    const trip = (db.trips || []).find((t) => t.id === req.params.id || t.slug === req.params.id);
+    if (!trip) {
+      return res.status(404).json({ error: 'Trip not found' });
+    }
+    res.json(trip);
+  } catch {
+    res.status(500).json({ error: 'Failed to fetch trip' });
+  }
+});
+
 app.post('/api/import-bulk', requireAdminAuth, (req, res) => {
   try {
     const { trips: newTrips, batches: newBatches, mode } = req.body;
@@ -830,6 +852,33 @@ app.delete('/api/trips/:id', requireAdminAuth, (req, res) => {
     res.json({ success: true });
   } catch {
     res.status(500).json({ error: 'Failed to delete trip' });
+  }
+});
+
+app.get('/api/batches', (req, res) => {
+  try {
+    const db = readDB();
+    const tripId = req.query.tripId as string | undefined;
+    let batches = Array.isArray(db.batches) ? db.batches : [];
+    if (tripId) {
+      batches = batches.filter((b) => b.tripId === tripId);
+    }
+    res.json(batches);
+  } catch {
+    res.status(500).json({ error: 'Failed to fetch batches' });
+  }
+});
+
+app.get('/api/batches/:id', (req, res) => {
+  try {
+    const db = readDB();
+    const batch = (db.batches || []).find((b) => b.id === req.params.id);
+    if (!batch) {
+      return res.status(404).json({ error: 'Batch not found' });
+    }
+    res.json(batch);
+  } catch {
+    res.status(500).json({ error: 'Failed to fetch batch' });
   }
 });
 
