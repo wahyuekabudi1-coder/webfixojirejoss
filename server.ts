@@ -9,11 +9,30 @@ import type { Tour } from './src/types.ts';
 // Load environment variables
 dotenv.config();
 
-const PORT = 3000;
-const DB_PATH = path.join(process.cwd(), 'src', 'sharetour', 'db.json');
-const PERSISTENT_DB_PATH = path.join(process.cwd(), 'data', 'db.json');
-const MAIN_TOURS_DATA_PATH = path.join(process.cwd(), 'data', 'main_tours.json');
-const MAIN_TOURS_SRC_PATH = path.join(process.cwd(), 'src', 'data', 'main_tours.json');
+const PORT = Number(process.env.PORT) || 3000;
+
+// Helper to determine the actual project root directory safely across environments (AI Studio, PM2, Passenger, Hostinger)
+function resolveProjectRoot(): string {
+  if (fs.existsSync(path.join(process.cwd(), 'package.json')) || fs.existsSync(path.join(process.cwd(), 'data', 'db.json'))) {
+    return process.cwd();
+  }
+  if (typeof __dirname !== 'undefined') {
+    const parentDir = path.resolve(__dirname, '..');
+    if (fs.existsSync(path.join(parentDir, 'package.json')) || fs.existsSync(path.join(parentDir, 'data', 'db.json'))) {
+      return parentDir;
+    }
+    if (fs.existsSync(path.join(__dirname, 'package.json')) || fs.existsSync(path.join(__dirname, 'data', 'db.json'))) {
+      return __dirname;
+    }
+  }
+  return process.cwd();
+}
+
+const PROJECT_ROOT = resolveProjectRoot();
+const DB_PATH = path.join(PROJECT_ROOT, 'src', 'sharetour', 'db.json');
+const PERSISTENT_DB_PATH = path.join(PROJECT_ROOT, 'data', 'db.json');
+const MAIN_TOURS_DATA_PATH = path.join(PROJECT_ROOT, 'data', 'main_tours.json');
+const MAIN_TOURS_SRC_PATH = path.join(PROJECT_ROOT, 'src', 'data', 'main_tours.json');
 
 // Helper to generate a unique booking code: SJ-[6 RANDOM ALPHANUMERIC CHARACTERS]
 function generateUniqueBookingCode(existingCodes: string[]): string {
@@ -673,7 +692,7 @@ app.post('/api/main-tours/sync-local', (req, res) => {
 // -------------------------------------------------------------
 // Admin Auto-Save Draft Storage API (Isolated from Production Data)
 // -------------------------------------------------------------
-const DRAFTS_PATH = path.join(process.cwd(), 'src', 'data', 'admin_drafts.json');
+const DRAFTS_PATH = path.join(PROJECT_ROOT, 'src', 'data', 'admin_drafts.json');
 
 function readAdminDrafts(): Record<string, any> {
   try {
@@ -1176,7 +1195,7 @@ app.post('/api/auth/login', loginLimiter, (req, res) => {
 // First-Party Analytics Engine & Secure Endpoints
 // -------------------------------------------------------------
 
-const ANALYTICS_PATH = path.join(process.cwd(), 'src', 'data', 'analytics_events.json');
+const ANALYTICS_PATH = path.join(PROJECT_ROOT, 'src', 'data', 'analytics_events.json');
 
 interface AnalyticsEventRecord {
   id: string;
@@ -2121,7 +2140,7 @@ app.get(['/api/orders/:orderId/payment-status', '/api/artopay/status/:orderId'],
 
 // Direct PDF Download route with forced attachment header
 app.get(['/download-booking-guide', '/api/download-booking-guide', '/download/booking-flow-pdf', '/api/download/booking-flow-pdf', '/download/panduan-booking.pdf'], (req, res) => {
-  const filePath = path.join(process.cwd(), 'public', 'smart_journey_booking_flow_guide.pdf');
+  const filePath = path.join(PROJECT_ROOT, 'public', 'smart_journey_booking_flow_guide.pdf');
   if (fs.existsSync(filePath)) {
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', 'attachment; filename="Panduan_Alur_Pemesanan_Wisata_Smart_Journey.pdf"');
@@ -2134,7 +2153,7 @@ app.get(['/download-booking-guide', '/api/download-booking-guide', '/download/bo
 // Frontend Asset Handling (Vite / Static production)
 // -------------------------------------------------------------
 
-app.use(express.static(path.join(process.cwd(), 'public')));
+app.use(express.static(path.join(PROJECT_ROOT, 'public')));
 
 async function startServer() {
   if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
@@ -2155,7 +2174,7 @@ async function startServer() {
     // Production Mode: Serve Compiled Frontend Assets from /dist
     console.log('Running in Production mode. Serving static assets from /dist...');
 
-    const distPath = path.join(process.cwd(), 'dist');
+    const distPath = path.join(PROJECT_ROOT, 'dist');
 
     app.use(express.static(distPath));
 
