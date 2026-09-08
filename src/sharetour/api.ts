@@ -35,13 +35,17 @@ function getAuthHeaders(): Record<string, string> {
   };
 }
 
-export async function fetchDB(retries = 3, initialDelayMs = 1000): Promise<DatabaseState> {
+export async function fetchDB(retries = 3, initialDelayMs = 1000, signal?: AbortSignal): Promise<DatabaseState> {
   let attempt = 0;
   let lastError: any = null;
 
   while (attempt <= retries) {
+    if (signal?.aborted) {
+      throw new Error("Aborted");
+    }
+
     try {
-      const res = await fetch(`${API_BASE}/db`);
+      const res = await fetch(`${API_BASE}/db`, { signal });
       if (!res.ok) {
         if (res.status === 502 || res.status === 503 || res.status === 504) {
           throw new Error(`Server starting up (${res.status})`);
@@ -49,13 +53,50 @@ export async function fetchDB(retries = 3, initialDelayMs = 1000): Promise<Datab
         const errText = await res.text().catch(() => "");
         throw new Error(`Failed to load ShareTour database (${res.status}): ${errText || res.statusText}`);
       }
-      const db: DatabaseState = await res.json();
+
+      const contentType = res.headers.get("content-type") || "";
+      if (!contentType.includes("application/json")) {
+        const textPreview = await res.text().catch(() => "");
+        const shortPreview = textPreview.replace(/\s+/g, " ").trim().slice(0, 80);
+        throw new Error(
+          `Invalid database response: expected JSON but received ${contentType || "unknown"}${
+            shortPreview ? ` (${shortPreview})` : ""
+          }`
+        );
+      }
+
+      let db: DatabaseState;
+      try {
+        db = await res.json();
+      } catch (jsonErr: any) {
+        throw new Error(`Failed to parse database JSON: ${jsonErr?.message || "Invalid JSON format"}`);
+      }
+
+      if (!db || typeof db !== "object") {
+        throw new Error("Invalid database payload structure");
+      }
+
       return db;
     } catch (err: any) {
+      if (err.name === "AbortError" || signal?.aborted) {
+        throw err;
+      }
       lastError = err;
       if (attempt < retries) {
         const delay = initialDelayMs * Math.pow(1.5, attempt);
-        await new Promise((resolve) => setTimeout(resolve, delay));
+        await new Promise<void>((resolve, reject) => {
+          const timer = setTimeout(() => {
+            if (signal) signal.removeEventListener("abort", onAbort);
+            resolve();
+          }, delay);
+          const onAbort = () => {
+            clearTimeout(timer);
+            reject(new Error("Aborted"));
+          };
+          if (signal) {
+            signal.addEventListener("abort", onAbort, { once: true });
+          }
+        });
         attempt++;
       } else {
         break;

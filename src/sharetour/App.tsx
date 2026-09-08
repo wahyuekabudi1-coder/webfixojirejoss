@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Trip, Batch, Booking } from "./types";
 import { fetchDB } from "./api";
 import TripListing from "./components/TripListing";
@@ -9,6 +9,27 @@ import StatusChecker from "./components/StatusChecker";
 import AdminLogin from "./components/AdminLogin";
 import AdminDashboard from "./components/AdminDashboard";
 import { RefreshCw, MapPin, Compass } from "lucide-react";
+
+// Backoff delays for cold-start resilience: 1s, 2s, 3s, 5s, 8s (Total ~19s window)
+const RETRY_DELAYS = [1000, 2000, 3000, 5000, 8000];
+
+function abortableSleep(ms: number, signal: AbortSignal): Promise<boolean> {
+  return new Promise((resolve) => {
+    if (signal.aborted) {
+      resolve(false);
+      return;
+    }
+    const timer = setTimeout(() => {
+      signal.removeEventListener("abort", onAbort);
+      resolve(true);
+    }, ms);
+    const onAbort = () => {
+      clearTimeout(timer);
+      resolve(false);
+    };
+    signal.addEventListener("abort", onAbort, { once: true });
+  });
+}
 
 export default function App() {
   const [trips, setTrips] = useState<Trip[]>([]);
@@ -34,24 +55,53 @@ export default function App() {
   const [retryCount, setRetryCount] = useState(0);
   const [errorMsg, setErrorMsg] = useState("");
 
-  const refreshDatabase = async (isManual = false) => {
+  // Race condition & cancellation references
+  const activeRequestIdRef = useRef(0);
+  const activeAbortControllerRef = useRef<AbortController | null>(null);
+
+  const refreshDatabase = useCallback(async (isManual = false, isBackgroundRecovery = false) => {
+    // Invalidate and cancel previous active request/loop
+    if (activeAbortControllerRef.current) {
+      activeAbortControllerRef.current.abort();
+    }
+
+    const requestId = ++activeRequestIdRef.current;
+    const controller = new AbortController();
+    activeAbortControllerRef.current = controller;
+
+    const isCurrent = () => requestId === activeRequestIdRef.current && !controller.signal.aborted;
+
     if (isManual) {
+      setLoading(true);
+      setErrorMsg("");
+      setRetryCount(0);
+    } else if (!isBackgroundRecovery) {
       setLoading(true);
       setErrorMsg("");
       setRetryCount(0);
     }
 
-    const maxRetries = 3;
-    let attempt = 0;
+    const maxRetries = RETRY_DELAYS.length;
     let lastErr: any = null;
 
-    while (attempt <= maxRetries) {
-      try {
-        if (attempt > 0) {
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      if (!isCurrent()) return;
+
+      if (attempt > 0) {
+        const delay = RETRY_DELAYS[attempt - 1];
+        if (!isBackgroundRecovery) {
           setRetryCount(attempt);
         }
-        // Attempt fetch
-        const db = await fetchDB(0);
+        console.warn(`[ShareTour DB Sync #${requestId}] Attempt ${attempt}/${maxRetries} failed, retrying in ${delay}ms...`, lastErr);
+        const ok = await abortableSleep(delay, controller.signal);
+        if (!ok || !isCurrent()) return;
+      }
+
+      try {
+        const db = await fetchDB(0, 1000, controller.signal);
+        if (!isCurrent()) return;
+
+        // Success: only the active request updates state and clears errors
         setTrips(Array.isArray(db.trips) ? db.trips : []);
         setBatches(Array.isArray(db.batches) ? db.batches : []);
         setBookings(Array.isArray(db.bookings) ? db.bookings : []);
@@ -60,22 +110,20 @@ export default function App() {
         setRetryCount(0);
         return;
       } catch (err: any) {
-        lastErr = err;
-        attempt++;
-        if (attempt <= maxRetries) {
-          setRetryCount(attempt);
-          const delay = attempt * 1200; // 1.2s, 2.4s, 3.6s
-          console.warn(`[ShareTour DB Sync] Attempt ${attempt}/${maxRetries} failed, retrying in ${delay}ms...`, err);
-          await new Promise((resolve) => setTimeout(resolve, delay));
+        if (!isCurrent() || err.name === "AbortError" || controller.signal.aborted) {
+          return;
         }
+        lastErr = err;
       }
     }
 
-    console.error("Database sync final failure:", lastErr);
+    if (!isCurrent()) return;
+
+    console.error(`[ShareTour DB Sync #${requestId}] Database sync final failure:`, lastErr);
     setErrorMsg(lastErr?.message || "Failed to connect to ShareTour server database.");
     setLoading(false);
     setRetryCount(0);
-  };
+  }, []);
 
   useEffect(() => {
     refreshDatabase();
@@ -97,10 +145,28 @@ export default function App() {
     window.addEventListener("hashchange", handleUrlRouting);
     window.addEventListener("popstate", handleUrlRouting);
     return () => {
+      // Abort active sync request on component unmount
+      if (activeAbortControllerRef.current) {
+        activeAbortControllerRef.current.abort();
+      }
       window.removeEventListener("hashchange", handleUrlRouting);
       window.removeEventListener("popstate", handleUrlRouting);
     };
-  }, []);
+  }, [refreshDatabase]);
+
+  // Auto-recovery: If an error is present, periodically probe every 15s in background
+  useEffect(() => {
+    if (!errorMsg) return;
+
+    const interval = setInterval(() => {
+      if (typeof document !== "undefined" && document.visibilityState !== "hidden") {
+        console.log("[ShareTour Auto-Recovery] Probing database connection...");
+        refreshDatabase(false, true);
+      }
+    }, 15000);
+
+    return () => clearInterval(interval);
+  }, [errorMsg, refreshDatabase]);
 
   const handleSelectTrip = (slug: string) => {
     setSelectedTripSlug(slug);
@@ -149,7 +215,7 @@ export default function App() {
             <RefreshCw className="w-10 h-10 text-[#315B4F] animate-spin" />
             <p className="text-sm font-sans font-medium text-gray-600">
               {retryCount > 0
-                ? `Menghubungkan ke database Share Tour (Percobaan ${retryCount}/3)...`
+                ? `Menghubungkan ke database Share Tour (Percobaan ${retryCount}/${RETRY_DELAYS.length})...`
                 : "Synchronizing Smart Journey Open Trips Database..."}
             </p>
           </div>
