@@ -1,0 +1,270 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&family=Noto+Sans+SC:wght@300;400;500;600;700;800&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Plus Jakarta Sans", "Noto Sans SC", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "WenQuanYi Micro Hei", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "Plus Jakarta Sans", "Noto Sans SC", monospace, sans-serif;
+  --font-serif: "Plus Jakarta Sans", "Noto Sans SC", serif;
+  --font-display: "Plus Jakarta Sans", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
+/* Force balanced multilingual typography */
+* {
+  font-family: "Plus Jakarta Sans", "Noto Sans SC", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "WenQuanYi Micro Hei", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+/* Chinese typography optimization */
+body.lang-zh {
+  letter-spacing: 0.01em;
+  word-break: break-word;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Premium styled horizontal scrollbar */
+.scrollbar-premium::-webkit-scrollbar {
+  height: 4px;
+}
+
+.scrollbar-premium::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 9999px;
+}
+
+.scrollbar-premium::-webkit-scrollbar-thumb {
+  background: rgba(245, 158, 11, 0.2);
+  border-radius: 9999px;
+  transition: background 0.3s ease;
+}
+
+.scrollbar-premium::-webkit-scrollbar-thumb:hover {
+  background: rgba(245, 158, 11, 0.6);
+}
+
+.scrollbar-premium {
+  -ms-overflow-style: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(245, 158, 11, 0.2) rgba(255, 255, 255, 0.03);
+  -webkit-overflow-scrolling: touch;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Base custom definitions and typography hierarchy */
+html {
+  scroll-behavior: smooth;
+  background-color: #F8FAF9;
+  font-family: "Plus Jakarta Sans", sans-serif;
+  overflow-x: hidden;
+  width: 100%;
+}
+
+body {
+  font-family: "Plus Jakarta Sans", sans-serif;
+  font-weight: 400;
+  line-height: 1.7;
+  overflow-x: hidden;
+  width: 100%;
+  background-color: #F8FAF9;
+  color: #171717;
+  -webkit-font-smoothing: antialiased;
+}
+
+#root {
+  overflow-x: hidden;
+  width: 100%;
+  min-height: 100vh;
+  background-color: #F8FAF9;
+}
+
+/* Typography Hierarchy Defaults */
+h1 {
+  font-family: "Plus Jakarta Sans", sans-serif;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+
+h2 {
+  font-family: "Plus Jakarta Sans", sans-serif;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+h3 {
+  font-family: "Plus Jakarta Sans", sans-serif;
+  font-weight: 600;
+}
+
+h4 {
+  font-family: "Plus Jakarta Sans", sans-serif;
+  font-weight: 600;
+}
+
+p, span, div {
+  font-family: "Plus Jakarta Sans", sans-serif;
+}
+
+button {
+  font-family: "Plus Jakarta Sans", sans-serif;
+  font-weight: 600;
+}
+
+label {
+  font-family: "Plus Jakarta Sans", sans-serif;
+  font-weight: 500;
+}
+
+input, select, textarea {
+  font-family: "Plus Jakarta Sans", sans-serif;
+  font-weight: 400;
+}
+
+input::placeholder, textarea::placeholder {
+  font-family: "Plus Jakarta Sans", sans-serif;
+  font-weight: 400;
+}
+
+/* Subtle Slow Spin animation for logo compass */
+@keyframes spin-slow {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.animate-spin-slow {
+  animation: spin-slow 20s linear infinite;
+}
+
+/* Accessibility: Clear focus-visible indicators */
+:focus-visible {
+  outline: 2px solid #f59e0b;
+  outline-offset: 2px;
+}
+
+/* Accessibility: Honor prefers-reduced-motion settings */
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ==========================================================================
+   ADMIN PORTAL FORM CONTRAST & ACCESSIBILITY (LIGHT THEME STANDARD)
+   Enforces high-contrast readable dark text, distinct slate-800 labels,
+   medium-gray placeholders, and crisp borders across all admin forms.
+   ========================================================================== */
+
+.admin-portal:not(.admin-dark),
+[data-admin-portal]:not(.admin-dark) {
+  --admin-form-label: #1e293b; /* slate-800: high contrast near-black */
+  --admin-form-text: #0f172a; /* slate-900: deep readable dark text */
+  --admin-form-bg: #ffffff; /* crisp white */
+  --admin-form-border: #cbd5e1; /* slate-300: visible distinct border */
+  --admin-form-placeholder: #64748b; /* slate-500: medium gray */
+  --admin-form-focus: #f59e0b; /* amber-500 */
+}
+
+/* 1. Form Labels */
+.admin-portal:not(.admin-dark) label:not(.toggle-label):not(.badge-label),
+[data-admin-portal]:not(.admin-dark) label:not(.toggle-label):not(.badge-label) {
+  color: #1e293b !important;
+  font-weight: 700 !important;
+}
+
+/* 2. Form Inputs, Textareas, and Selects */
+.admin-portal:not(.admin-dark) input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="button"]):not([type="file"]),
+.admin-portal:not(.admin-dark) textarea,
+.admin-portal:not(.admin-dark) select,
+[data-admin-portal]:not(.admin-dark) input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="button"]):not([type="file"]),
+[data-admin-portal]:not(.admin-dark) textarea,
+[data-admin-portal]:not(.admin-dark) select {
+  color: #0f172a !important;
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  -webkit-text-fill-color: #0f172a !important;
+}
+
+/* 3. Placeholder Styling: Clear Medium Gray */
+.admin-portal:not(.admin-dark) input::placeholder,
+.admin-portal:not(.admin-dark) textarea::placeholder,
+[data-admin-portal]:not(.admin-dark) input::placeholder,
+[data-admin-portal]:not(.admin-dark) textarea::placeholder {
+  color: #64748b !important;
+  opacity: 1 !important;
+  -webkit-text-fill-color: #64748b !important;
+}
+
+/* 4. Focus State */
+.admin-portal:not(.admin-dark) input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="button"]):not([type="file"]):focus,
+.admin-portal:not(.admin-dark) textarea:focus,
+.admin-portal:not(.admin-dark) select:focus,
+[data-admin-portal]:not(.admin-dark) input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="button"]):not([type="file"]):focus,
+[data-admin-portal]:not(.admin-dark) textarea:focus,
+[data-admin-portal]:not(.admin-dark) select:focus {
+  border-color: #f59e0b !important;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.25) !important;
+  outline: none !important;
+}
+
+/* 5. Disabled / Readonly Inputs */
+.admin-portal:not(.admin-dark) input:disabled,
+.admin-portal:not(.admin-dark) textarea:disabled,
+.admin-portal:not(.admin-dark) select:disabled,
+[data-admin-portal]:not(.admin-dark) input:disabled,
+[data-admin-portal]:not(.admin-dark) textarea:disabled,
+[data-admin-portal]:not(.admin-dark) select:disabled {
+  background-color: #f1f5f9 !important;
+  color: #334155 !important;
+  border-color: #cbd5e1 !important;
+  -webkit-text-fill-color: #334155 !important;
+  cursor: not-allowed;
+}
+
+/* 6. Dropdown Options */
+.admin-portal:not(.admin-dark) select option,
+[data-admin-portal]:not(.admin-dark) select option {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  font-weight: 500 !important;
+}
+
+/* 7. Numbers, Currency, and Date pickers */
+.admin-portal:not(.admin-dark) input[type="number"],
+.admin-portal:not(.admin-dark) input[type="date"],
+.admin-portal:not(.admin-dark) input[type="time"],
+.admin-portal:not(.admin-dark) input[type="datetime-local"],
+[data-admin-portal]:not(.admin-dark) input[type="number"],
+[data-admin-portal]:not(.admin-dark) input[type="date"],
+[data-admin-portal]:not(.admin-dark) input[type="time"],
+[data-admin-portal]:not(.admin-dark) input[type="datetime-local"] {
+  color: #0f172a !important;
+  -webkit-text-fill-color: #0f172a !important;
+}
+

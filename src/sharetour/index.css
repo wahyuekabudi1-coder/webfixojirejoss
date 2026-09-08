@@ -1,0 +1,57 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Plus Jakarta Sans", sans-serif;
+  --font-mono: "Plus Jakarta Sans", ui-monospace, SFMono-Regular, monospace;
+}
+
+* {
+  font-family: "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+/* Custom classes for travel themes */
+.primary-green {
+  color: #315B4F;
+}
+
+.bg-primary-green {
+  background-color: #315B4F;
+}
+
+.secondary-gold {
+  color: #D6B16D;
+}
+
+.bg-secondary-gold {
+  background-color: #D6B16D;
+}
+
+body {
+  font-family: "Plus Jakarta Sans", sans-serif;
+  background-color: #F4F7F5;
+  color: #1F2E2A;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: "Plus Jakarta Sans", sans-serif;
+}
+
+/* Hide scrollbars elegantly */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f3f2;
+}
+::-webkit-scrollbar-thumb {
+  background: #315b4f40;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #315B4F;
+}
+

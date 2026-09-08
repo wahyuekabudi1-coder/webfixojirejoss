@@ -1,0 +1,56 @@
+Halo! Berikut adalah petunjuk mudah dan lengkap untuk mengunggah (upload) logo serta gambar latar belakang & foto tim Anda secara mandiri di AI Studio:
+
+==================================================
+1. DI MANA SAYA HARUS MENGUNGGAH FILE GAMBAR?
+==================================================
+Semua file gambar atau logo kustom harus diunggah ke dalam folder bernama 'public' di direktori utama proyek ini.
+- Folder 'public' ini terletak di panel kiri layar AI Studio (File Explorer).
+- Cukup seret (drag & drop) file gambar Anda dari komputer langsung ke dalam folder 'public' tersebut di panel kiri.
+
+==================================================
+2. APA SAJA NAMA FILE YANG BISA SAYA GUNAKAN?
+==================================================
+Sistem telah kami atur secara cerdas untuk membaca file Anda secara otomatis. Anda cukup menamai file Anda sesuai daftar di bawah ini sebelum/sesudah diunggah:
+
+a. Logo Perusahaan (Header & Footer):
+   • Nama file: logo.png  (atau logo.svg / logo.jpg)
+   • Ukuran rekomendasi: Horizontal/lanskap dengan latar belakang transparan (PNG).
+
+b. Gambar Latar Belakang Atas (Hero Header - About Us):
+   • Nama file: about-bg.jpg  (atau about-bg.png)
+   • Gambar ini akan langsung menggantikan gambar latar belakang mobil van mewah di bagian atas halaman About.
+
+c. Foto Driver Crew & Guide Team (Bagian Tengah - About Us):
+   • Nama file: team.jpg  (atau team.png)
+   • Gambar ini akan menggantikan foto tim/kru profesional di bawah judul "Who We Are".
+
+d. Foto Interior VIP Luxury Cabin (Bagian Bawah - About Us):
+   • Nama file: cabin.jpg  (atau cabin.png)
+   • Gambar ini akan menggantikan foto interior jok kulit mewah di bawah bagian FAQ "About Our Journey".
+
+e. Gambar Hero Banner Slide (Halaman Utama / Home):
+   • Slide 1 (Bromo): bromo.png
+   • Slide 2 (Tumpak Sewu): tumpak-sewu.png
+   • Slide 3 (Kawah Ijen): kawah-ijen.png
+   • Slide 4 (Bali): bali.png
+   • Slide 5 (Nusa Penida): nusa-penida.png
+
+==================================================
+3. SPESIFIKASI FORMAT, REKOMENDASI UKURAN & DIMENSI:
+==================================================
+• Format Berkas: .jpg / .jpeg (Foto pemandangan) atau .webp (sangat ringan). Gunakan .png transparan khusus untuk Logo.
+• Dimensi Desktop / PC: 1920 x 1080 px (Rasio 16:9, Full HD).
+• Dimensi Tablet: 1280 x 720 px (Rasio 16:9).
+• Dimensi Mobile / HP: 1080 x 720 px atau 800 x 600 px (Fokus objek di bagian tengah/center).
+• Ukuran Berkas (File Size): Disarankan di bawah 300 KB – 500 KB per gambar agar loading website sangat cepat.
+
+==================================================
+4. LANGKAH-LANGKAH CARA MENGUNGGAHNYA:
+==================================================
+1. Siapkan file gambar di komputer Anda dan ganti namanya terlebih dahulu (misalnya: team.jpg, about-bg.jpg, atau logo.png).
+2. Di panel sebelah kiri AI Studio Anda, temukan daftar file (File Explorer).
+3. Cari folder bernama "public" (klik folder tersebut jika ingin membukanya).
+4. Seret (drag) file Anda dari komputer, lalu lepaskan (drop) tepat di atas folder "public" di panel tersebut.
+5. Selesai! Begitu file selesai terunggah, buka atau segarkan aplikasi Anda, dan gambar kustom Anda akan langsung terpasang sempurna tanpa merusak tulisan atau tata letak lainnya!
+
+Jika ada bagian yang kurang jelas atau butuh panduan tambahan, kami siap membantu Anda!

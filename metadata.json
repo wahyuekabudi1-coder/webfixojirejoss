@@ -1,0 +1,6 @@
+{
+  "name": "Smart Journey",
+  "description": "Layanan travel premium, tur privat, transfer bandara, taksi, dan kemitraan lokal terverifikasi di Indonesia bersama Smart Journey.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
