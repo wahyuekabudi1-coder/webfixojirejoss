@@ -8280,7 +8280,7 @@ export default function AdminView() {
                               <td className="p-3.5 text-center">
                                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold font-mono uppercase ${
                                   item.status === 'Confirmed' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
-                                  item.status === 'Pending' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20 animate-pulse' :
+                                  (item.status === 'Pending' || item.status === 'Pending Confirmation') ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20 animate-pulse' :
                                   item.status === 'Completed' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' :
                                   'bg-rose-500/10 text-rose-400 border border-rose-500/20'
                                 }`}>
@@ -8290,7 +8290,7 @@ export default function AdminView() {
                               <td className="p-3.5 text-right space-x-1.5">
                                 {item.source === 'main' ? (
                                   <>
-                                    {item.status === 'Pending' && (
+                                    {(item.status === 'Pending' || item.status === 'Pending Confirmation') && (
                                       <button
                                         onClick={() => {
                                           updateBookingStatus(item.id, 'Confirmed');

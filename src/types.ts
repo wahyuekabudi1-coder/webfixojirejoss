@@ -103,8 +103,9 @@ export interface Booking {
   customerEmail: string;
   customerPhone: string;
   bookingDate: string;
-  status: 'Pending' | 'Confirmed' | 'Completed';
-  paymentStatus?: 'Unpaid' | 'Paid' | 'Pending';
+  status: 'Pending' | 'Pending Confirmation' | 'Confirmed' | 'Completed' | 'Cancelled' | 'Refunded' | 'Rejected' | string;
+  paymentStatus?: 'Unpaid' | 'Paid' | 'Pending' | 'Pending Payment' | 'Failed' | 'Expired' | 'Amount Mismatch' | string;
+  paymentNotes?: string;
 }
 
 export interface AirportRoute {

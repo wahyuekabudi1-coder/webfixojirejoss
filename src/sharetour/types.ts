@@ -58,7 +58,7 @@ export interface Batch {
   status: 'Open' | 'Closed';
 }
 
-export type BookingStatus = 'Pending' | 'Confirmed' | 'Rejected';
+export type BookingStatus = 'Pending' | 'Pending Confirmation' | 'Confirmed' | 'Completed' | 'Rejected' | 'Cancelled' | string;
 export type NationalityType = 'WNI' | 'WNA' | 'WNA_CHINA' | 'WNA_EUROPE';
 
 export interface ParticipantData {
@@ -107,6 +107,7 @@ export interface Booking {
   createdAt: string;
   participantData?: ParticipantData;
   adminNotes?: string;
+  paymentNotes?: string;
   nationalityType?: NationalityType;
 }
 

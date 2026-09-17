@@ -559,7 +559,7 @@ app.get('/api/main-tours/:id', (req, res) => {
 });
 
 // 3. Create new main tour
-app.post('/api/main-tours', (req, res) => {
+app.post('/api/main-tours', requireAdminAuth, (req, res) => {
   try {
     const payload = req.body;
 
@@ -599,7 +599,7 @@ app.post('/api/main-tours', (req, res) => {
 });
 
 // 4. Update existing main tour
-app.put('/api/main-tours/:id', (req, res) => {
+app.put('/api/main-tours/:id', requireAdminAuth, (req, res) => {
   try {
     const tours = readMainTours();
     const tourId = req.params.id;
@@ -627,7 +627,7 @@ app.put('/api/main-tours/:id', (req, res) => {
 });
 
 // 5. Delete main tour
-app.delete('/api/main-tours/:id', (req, res) => {
+app.delete('/api/main-tours/:id', requireAdminAuth, (req, res) => {
   try {
     const tours = readMainTours();
     const tourId = req.params.id;
@@ -647,7 +647,7 @@ app.delete('/api/main-tours/:id', (req, res) => {
 });
 
 // 6. One-time migration / Local storage sync endpoint
-app.post('/api/main-tours/sync-local', (req, res) => {
+app.post('/api/main-tours/sync-local', requireAdminAuth, (req, res) => {
   try {
     const { localTours } = req.body;
     if (!Array.isArray(localTours) || localTours.length === 0) {
@@ -1107,38 +1107,66 @@ app.post('/api/bookings', (req, res) => {
   }
 });
 
+app.get('/api/bookings', (req, res) => {
+  try {
+    const db = readDB();
+    res.json(db.bookings || []);
+  } catch {
+    res.status(500).json({ error: 'Failed to read bookings' });
+  }
+});
+
+app.get('/api/bookings/:id', (req, res) => {
+  try {
+    const db = readDB();
+    const id = req.params.id;
+    const booking = (db.bookings || []).find((b) => b.id === id || b.bookingCode === id);
+    if (!booking) {
+      return res.status(404).json({ error: 'Booking tidak ditemukan.' });
+    }
+    res.json(booking);
+  } catch {
+    res.status(500).json({ error: 'Failed to read booking' });
+  }
+});
+
 app.put('/api/bookings/:id', requireAdminAuth, (req, res) => {
   try {
     const db = readDB();
-    const index = db.bookings.findIndex((b) => b.id === req.params.id);
+    const targetId = req.params.id;
+    const index = db.bookings.findIndex((b) => b.id === targetId || b.bookingCode === targetId);
 
     if (index === -1) {
       return res.status(404).json({ error: 'Kode booking tidak ditemukan.' });
     }
 
     const originalBooking = db.bookings[index];
-    const nextBooking = { ...originalBooking, ...req.body };
+    const updates = req.body || {};
+    const nextBooking = { 
+      ...originalBooking, 
+      ...updates,
+      id: originalBooking.id,
+      bookingCode: originalBooking.bookingCode
+    };
 
-    if (nextBooking.status === 'Rejected' && originalBooking.status !== 'Rejected') {
+    const isNowRejected = nextBooking.status === 'Rejected' || nextBooking.status === 'Cancelled';
+    const wasRejected = originalBooking.status === 'Rejected' || originalBooking.status === 'Cancelled';
+
+    if (isNowRejected && !wasRejected && originalBooking.batchId) {
       const bIdx = db.batches.findIndex((b) => b.id === originalBooking.batchId);
-
       if (bIdx !== -1) {
-        db.batches[bIdx].availableSeats += originalBooking.participantsCount;
-
+        db.batches[bIdx].availableSeats += (originalBooking.participantsCount || 1);
         if (db.batches[bIdx].availableSeats > 0) {
           db.batches[bIdx].status = 'Open';
         }
       }
     }
 
-    if (originalBooking.status === 'Rejected' && nextBooking.status !== 'Rejected') {
+    if (wasRejected && !isNowRejected && originalBooking.batchId) {
       const bIdx = db.batches.findIndex((b) => b.id === originalBooking.batchId);
-
       if (bIdx !== -1) {
-        db.batches[bIdx].availableSeats -= originalBooking.participantsCount;
-
+        db.batches[bIdx].availableSeats -= (originalBooking.participantsCount || 1);
         if (db.batches[bIdx].availableSeats < 0) db.batches[bIdx].availableSeats = 0;
-
         if (db.batches[bIdx].availableSeats <= 0) {
           db.batches[bIdx].status = 'Closed';
         }
@@ -1147,9 +1175,11 @@ app.put('/api/bookings/:id', requireAdminAuth, (req, res) => {
 
     db.bookings[index] = nextBooking;
     writeDB(db);
+    console.log(`[Admin] Booking ${nextBooking.id} (${nextBooking.bookingCode}) updated: status=${nextBooking.status}, paymentStatus=${nextBooking.paymentStatus}`);
     res.json(db.bookings[index]);
-  } catch {
-    res.status(500).json({ error: 'Failed to update booking' });
+  } catch (err: any) {
+    console.error('Failed to update booking:', err);
+    res.status(500).json({ error: 'Failed to update booking', details: err.message });
   }
 });
 
@@ -1732,7 +1762,7 @@ app.post(['/api/artopay/payment-intent', '/artopay/payment-intent', '/api/paymen
 
     // CATEGORY A: SECURITY & CONFIGURATION RULE - Reject request if Secret Key is missing in process.env
     if (!secretKey) {
-      const configErrorMsg = 'Integrasi ArtoPay belum siap. ARTOPAY_SECRET_KEY belum diisi di Environment Variables Vercel/Server Production.';
+      const configErrorMsg = 'Integrasi ArtoPay belum siap. ARTOPAY_SECRET_KEY belum diisi di Environment Variables Server Production.';
       console.error('[ArtoPay Server Error]', configErrorMsg, {
         envMode,
         baseUrl,
@@ -1743,7 +1773,7 @@ app.post(['/api/artopay/payment-intent', '/artopay/payment-intent', '/api/paymen
       return res.status(500).json({
         category: 'ENVIRONMENT_VARIABLE_MISSING',
         error: configErrorMsg,
-        details: 'Variabel ARTOPAY_SECRET_KEY bernilai undefined/kosong pada serverless runtime Vercel.',
+        details: 'Variabel ARTOPAY_SECRET_KEY bernilai undefined/kosong pada server runtime.',
         envCheck: {
           ARTOPAY_ENV: envMode,
           ARTOPAY_API_BASE_URL: baseUrl,
@@ -1754,48 +1784,31 @@ app.post(['/api/artopay/payment-intent', '/artopay/payment-intent', '/api/paymen
     }
 
     // Check DB for existing order to avoid double payment or amount tampering
+    // BACKEND IS THE SINGLE SOURCE OF TRUTH FOR PAYMENT AMOUNT
     const db = readDB();
     if (!db.bookings) db.bookings = [];
 
-    let existingOrderIndex = db.bookings.findIndex(b => b.bookingCode === orderId || b.id === orderId);
-    let existingOrder = existingOrderIndex !== -1 ? db.bookings[existingOrderIndex] : null;
+    const existingOrderIndex = db.bookings.findIndex(b => b.bookingCode === orderId || b.id === orderId);
+    const existingOrder = existingOrderIndex !== -1 ? db.bookings[existingOrderIndex] : null;
 
-    if (existingOrder) {
-      if (existingOrder.paymentStatus === 'Paid' || existingOrder.status === 'Confirmed') {
-        return res.status(400).json({ error: 'Pesanan ini sudah lunas (PAID). Pembayaran ulang tidak diperlukan.' });
-      }
-
-      if (existingOrder.totalPriceIDR || existingOrder.totalPrice) {
-        numericAmount = Number(existingOrder.totalPriceIDR || existingOrder.totalPrice);
-      }
-    } else {
-      // Register initial order in DB with PENDING status
-      existingOrder = {
-        id: String(orderId),
-        bookingCode: String(orderId),
-        tripId: 'General',
-        tripTitle: description || 'SmartJourney Booking',
-        batchId: '',
-        fullName: customerName || 'Customer',
-        customerName: customerName || 'Customer',
-        email: customerEmail || 'customer@example.com',
-        customerEmail: customerEmail || 'customer@example.com',
-        phone: customerPhone || 'N/A',
-        customerPhone: customerPhone || 'N/A',
-        participantsCount: 1,
-        participantsNames: [customerName || 'Customer'],
-        proofOfPayment: 'ARTOPAY_GATEWAY',
-        status: 'Pending',
-        paymentStatus: 'Pending',
-        totalPrice: numericAmount,
-        totalPriceIDR: numericAmount,
-        createdAt: new Date().toISOString()
-      };
-
-      db.bookings.push(existingOrder);
-      existingOrderIndex = db.bookings.length - 1;
-      writeDB(db);
+    if (!existingOrder) {
+      console.warn(`[Payment Intent Rejected] Order ${orderId} does not exist in database.`);
+      return res.status(404).json({
+        error: 'Booking tidak ditemukan di database backend. Silakan lengkapi dan simpan pesanan terlebih dahulu.',
+        orderId
+      });
     }
+
+    if (existingOrder.paymentStatus === 'Paid') {
+      return res.status(400).json({ error: 'Pesanan ini sudah lunas (PAID). Pembayaran ulang tidak diperlukan.' });
+    }
+
+    // Backend authoritative amount check (Never trust frontend amount directly)
+    const backendAuthoritativeAmount = Number(existingOrder.totalPriceIDR || existingOrder.totalPrice);
+    if (!backendAuthoritativeAmount || isNaN(backendAuthoritativeAmount) || backendAuthoritativeAmount <= 0) {
+      return res.status(400).json({ error: 'Nominal harga booking tidak valid di database backend.' });
+    }
+    numericAmount = backendAuthoritativeAmount;
 
     const rawBusinessUnitCode = process.env.ARTOPAY_BUSINESS_UNIT_CODE || process.env.ARTOPAY_BUSINESS_UNIT || '';
     const businessUnitCode = rawBusinessUnitCode.replace(/^["']|["']$/g, '').trim();
@@ -1966,7 +1979,18 @@ app.post(['/api/artopay/webhook', '/artopay/webhook'], (req, res) => {
 
     const webhookSecret = (process.env.WEBHOOK_SECRET || process.env.ARTOPAY_SECRET_KEY || '').trim();
 
-    if (incomingSignature && webhookSecret) {
+    // STRICT HMAC VERIFICATION: Reject with 401 if invalid signature or missing signature when secret configured
+    if (incomingSignature || webhookSecret) {
+      if (!incomingSignature) {
+        console.error('[ArtoPay Webhook Security] Webhook signature missing in headers or payload.');
+        return res.status(401).json({ error: 'Missing webhook signature' });
+      }
+
+      if (!webhookSecret) {
+        console.error('[ArtoPay Webhook Security] Signature provided but WEBHOOK_SECRET / ARTOPAY_SECRET_KEY not set on server.');
+        return res.status(401).json({ error: 'Invalid webhook signature: secret not configured on server' });
+      }
+
       try {
         const rawPayload = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
         const expectedSignature = crypto
@@ -1975,16 +1999,16 @@ app.post(['/api/artopay/webhook', '/artopay/webhook'], (req, res) => {
           .digest('hex');
 
         if (incomingSignature.toLowerCase() !== expectedSignature.toLowerCase()) {
-          console.warn('[ArtoPay Webhook Signature Warning] Mismatched webhook signature received:', {
+          console.error('[ArtoPay Webhook Security] Mismatched webhook signature received:', {
             incoming: incomingSignature,
             expected: expectedSignature
           });
-          // Note: If strict verification is required, we can reject with 401. Logged clearly for audit trail.
-        } else {
-          console.log('[ArtoPay Webhook Signature Verified] Authenticity confirmed via HMAC-SHA256.');
+          return res.status(401).json({ error: 'Invalid webhook signature' });
         }
+        console.log('[ArtoPay Webhook Signature Verified] Authenticity confirmed via HMAC-SHA256.');
       } catch (sigErr) {
-        console.warn('[ArtoPay Webhook Signature Check Exception]:', sigErr);
+        console.error('[ArtoPay Webhook Signature Verification Exception]:', sigErr);
+        return res.status(401).json({ error: 'Webhook signature verification failed' });
       }
     }
 
@@ -2006,17 +2030,36 @@ app.post(['/api/artopay/webhook', '/artopay/webhook'], (req, res) => {
 
     if (index === -1) {
       console.warn(`[ArtoPay Webhook] Order ${orderId || paymentId} not found in database.`);
-      return res.status(200).json({ success: true, message: 'Webhook received but order not in DB.' });
+      return res.status(404).json({ error: 'Order not found in database', orderId: orderId || paymentId });
     }
 
     const booking = db.bookings[index];
 
-    // IDEMPOTENCY CHECK: If already confirmed and paid, do not re-process!
-    if (booking.paymentStatus === 'Paid' && booking.status === 'Confirmed') {
-      console.log(`[ArtoPay Webhook IDEMPOTENT] Order ${orderId || booking.id} is already Paid & Confirmed.`);
+    // IDEMPOTENCY CHECK: If already paid, do not re-process or revert status
+    if (booking.paymentStatus === 'Paid') {
+      console.log(`[ArtoPay Webhook IDEMPOTENT] Order ${orderId || booking.id} is already Paid. Retaining booking status (${booking.status}).`);
       return res.status(200).json({
         success: true,
-        message: 'Order status is already Paid (Idempotent call).'
+        message: 'Order status is already Paid (Idempotent call).',
+        orderId: booking.bookingCode || booking.id,
+        paymentStatus: booking.paymentStatus,
+        bookingStatus: booking.status
+      });
+    }
+
+    // AMOUNT VALIDATION: Ensure amount matches authoritative price in database
+    const receivedAmount = Number(body.amount || body.gross_amount || body.data?.amount || body.data?.gross_amount || 0);
+    const expectedAmount = Number(booking.totalPriceIDR || booking.totalPrice || 0);
+    if (receivedAmount > 0 && expectedAmount > 0 && Math.abs(receivedAmount - expectedAmount) > 1) {
+      console.error(`[ArtoPay Webhook Amount Mismatch] Order ${orderId || booking.id}: Expected ${expectedAmount}, received ${receivedAmount}`);
+      booking.paymentStatus = 'Amount Mismatch';
+      booking.paymentNotes = `Amount mismatch: expected ${expectedAmount}, received ${receivedAmount}`;
+      db.bookings[index] = booking;
+      writeDB(db);
+      return res.status(400).json({
+        error: 'Payment amount mismatch',
+        expectedAmount,
+        receivedAmount
       });
     }
 
@@ -2025,24 +2068,28 @@ app.post(['/api/artopay/webhook', '/artopay/webhook'], (req, res) => {
 
     if (successStatuses.includes(rawStatus)) {
       booking.paymentStatus = 'Paid';
-      booking.status = 'Confirmed';
-      booking.paidAt = new Date().toISOString();
+      // PAYMENT STATUS ≠ BOOKING STATUS
+      // Customer has paid, but booking is Pending Confirmation until Admin confirms
+      if (booking.status !== 'Confirmed' && booking.status !== 'Completed') {
+        booking.status = 'Pending Confirmation';
+      }
+      booking.paidAt = booking.paidAt || new Date().toISOString();
       booking.paymentId = paymentId || booking.paymentIntentId;
 
-      console.log(`[ArtoPay Webhook SUCCESS] Order ${orderId || booking.id} status set to PAID & CONFIRMED.`);
+      console.log(`[ArtoPay Webhook SUCCESS] Order ${orderId || booking.id}: Payment Status set to PAID, Booking Status set to ${booking.status}.`);
     } else if (failureStatuses.includes(rawStatus)) {
       booking.paymentStatus = (rawStatus === 'EXPIRED' || rawStatus === 'EXPIRE') ? 'Expired' : 'Failed';
-      booking.status = 'Rejected';
+      if (booking.status !== 'Confirmed' && booking.status !== 'Completed') {
+        booking.status = 'Cancelled';
+      }
 
       console.log(`[ArtoPay Webhook FAILURE] Order ${orderId || booking.id} status set to ${booking.paymentStatus}.`);
 
       // Restore batch seats if applicable
       if (booking.batchId) {
         const bIdx = db.batches.findIndex(b => b.id === booking.batchId);
-
         if (bIdx !== -1) {
           db.batches[bIdx].availableSeats += (booking.participantsCount || 1);
-
           if (db.batches[bIdx].availableSeats > 0) {
             db.batches[bIdx].status = 'Open';
           }
@@ -2050,7 +2097,9 @@ app.post(['/api/artopay/webhook', '/artopay/webhook'], (req, res) => {
       }
     } else {
       booking.paymentStatus = 'Pending';
-      booking.status = 'Pending';
+      if (booking.status !== 'Confirmed' && booking.status !== 'Completed') {
+        booking.status = 'Pending';
+      }
     }
 
     db.bookings[index] = booking;
@@ -2060,6 +2109,7 @@ app.post(['/api/artopay/webhook', '/artopay/webhook'], (req, res) => {
       success: true,
       orderId: booking.bookingCode || booking.id,
       paymentStatus: booking.paymentStatus,
+      bookingStatus: booking.status,
       orderStatus: booking.status
     });
   } catch (error: any) {
@@ -2110,12 +2160,16 @@ app.get(['/api/orders/:orderId/payment-status', '/api/artopay/status/:orderId'],
 
             if (['SUCCESS', 'PAID', 'SETTLEMENT', 'COMPLETED', '00'].includes(remoteStatus)) {
               booking.paymentStatus = 'Paid';
-              booking.status = 'Confirmed';
+              if (booking.status === 'Pending') {
+                booking.status = 'Pending Confirmation';
+              }
               booking.paidAt = new Date().toISOString();
               writeDB(db);
             } else if (['FAILED', 'CANCELLED', 'EXPIRED'].includes(remoteStatus)) {
               booking.paymentStatus = remoteStatus === 'EXPIRED' ? 'Expired' : 'Failed';
-              booking.status = 'Rejected';
+              if (booking.status !== 'Confirmed') {
+                booking.status = 'Cancelled';
+              }
               writeDB(db);
             }
           }
@@ -2130,6 +2184,7 @@ app.get(['/api/orders/:orderId/payment-status', '/api/artopay/status/:orderId'],
       orderId: booking.bookingCode || booking.id,
       paymentStatus: booking.paymentStatus || 'Pending',
       orderStatus: booking.status || 'Pending',
+      bookingStatus: booking.status || 'Pending',
       paidAt: booking.paidAt || null,
       booking
     });

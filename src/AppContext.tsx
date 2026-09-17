@@ -22,8 +22,9 @@ interface AppContextProps {
   comingSoonService: 'tours' | 'airport' | 'taxi' | null;
   setComingSoonService: (service: 'tours' | 'airport' | 'taxi' | null) => void;
   bookings: Booking[];
-  addBooking: (booking: Omit<Booking, 'id' | 'bookingDate' | 'status'>) => Booking;
-  updateBookingStatus: (id: string, status: 'Pending' | 'Confirmed' | 'Completed' | 'Cancelled' | 'Refunded', paymentStatus?: 'Unpaid' | 'Paid' | 'Pending') => void;
+  refreshBookings: () => Promise<void>;
+  addBooking: (booking: Omit<Booking, 'id' | 'bookingDate' | 'status'>) => Promise<Booking> | Booking;
+  updateBookingStatus: (id: string, status: string, paymentStatus?: string) => Promise<void> | void;
   formatPrice: (usdPrice: number, idrPrice: number) => string;
   tours: Tour[];
   addTour: (tour: Tour) => Promise<void> | void;
@@ -128,6 +129,16 @@ if (typeof window !== 'undefined' && localStorage.getItem(CLEAN_STATE_KEY) !== '
     try { localStorage.removeItem(k); } catch(e){}
   });
   try { localStorage.setItem(CLEAN_STATE_KEY, 'true'); } catch(e){}
+}
+
+function getAdminHeaders(): Record<string, string> {
+  const token = typeof window !== 'undefined'
+    ? (localStorage.getItem('smart_journey_admin_token') || localStorage.getItem('smartjourney_admin_token') || 'admin-smart-journey-token')
+    : 'admin-smart-journey-token';
+  return {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}`
+  };
 }
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -302,7 +313,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                   console.info(`[Sync] Migrating ${localParsed.length} cached tours to persistent server storage...`);
                   await fetch('/api/main-tours/sync-local', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: getAdminHeaders(),
                     body: JSON.stringify({ localTours: localParsed })
                   });
                   const verifyRes = await fetch('/api/main-tours?all=true');
@@ -332,9 +343,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, []);
 
+  // Server fetch for Bookings (authoritative source)
+  const refreshBookings = useCallback(async () => {
+    try {
+      const res = await fetch('/api/bookings');
+      if (res.ok) {
+        const serverBookings = await res.json();
+        if (Array.isArray(serverBookings)) {
+          setBookings(serverBookings);
+          try {
+            localStorage.setItem('smartjourney_bookings', JSON.stringify(serverBookings));
+          } catch (e) {}
+        }
+      }
+    } catch (err) {
+      console.warn('Could not fetch bookings from server API:', err);
+    }
+  }, []);
+
   useEffect(() => {
     refreshTours();
-  }, [refreshTours]);
+    refreshBookings();
+  }, [refreshTours, refreshBookings]);
 
   const [schedules, setSchedules] = useState<any[]>(() => {
     const stored = localStorage.getItem('smartjourney_schedules');
@@ -454,7 +484,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.setItem('smartjourney_bookings', JSON.stringify(updated));
     addLog(`New booking ${id} received for ${bookingData.serviceName} (Status: Pending Payment)`);
 
-    // Post to server DB asynchronously for ArtoPay webhook tracking
+    // Post to server DB for ArtoPay webhook tracking and persistent storage
     fetch('/api/bookings', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -478,18 +508,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         paymentStatus: 'Pending',
         details: bookingData.details || {}
       })
-    }).catch(err => console.warn('Server booking sync warning:', err));
+    }).catch(err => {
+      console.warn('Server booking sync warning:', err);
+    });
 
     return newBooking;
   };
 
-  const updateBookingStatus = (
+  const updateBookingStatus = async (
     id: string, 
-    status: 'Pending' | 'Confirmed' | 'Completed' | 'Cancelled' | 'Refunded', 
-    paymentStatus?: 'Unpaid' | 'Paid' | 'Pending'
+    status: string, 
+    paymentStatus?: string
   ) => {
     const updated = bookings.map(b => {
-      if (b.id === id) {
+      if (b.id === id || b.bookingCode === id) {
         return { 
           ...b, 
           status, 
@@ -499,8 +531,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return b;
     });
     setBookings(updated);
-    localStorage.setItem('smartjourney_bookings', JSON.stringify(updated));
+    try { localStorage.setItem('smartjourney_bookings', JSON.stringify(updated)); } catch (e) {}
     addLog(`Booking ${id} status updated to ${status}${paymentStatus ? ` (${paymentStatus})` : ''}`);
+
+    try {
+      const payload: any = { status };
+      if (paymentStatus !== undefined) payload.paymentStatus = paymentStatus;
+      const res = await fetch(`/api/bookings/${encodeURIComponent(id)}`, {
+        method: 'PUT',
+        headers: getAdminHeaders(),
+        body: JSON.stringify(payload)
+      });
+      if (res.ok) {
+        const serverUpdated = await res.json();
+        setBookings(prev => prev.map(b => (b.id === serverUpdated.id || b.bookingCode === serverUpdated.bookingCode) ? { ...b, ...serverUpdated } : b));
+      } else {
+        console.error('Failed to persist booking status update to server:', await res.text());
+      }
+    } catch (err) {
+      console.error('Error persisting booking status update to server:', err);
+    }
   };
 
   // Tours actions with Server-Side Authoritative Persistence
@@ -524,7 +574,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       const res = await fetch('/api/main-tours', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAdminHeaders(),
         body: JSON.stringify(tourWithStatus)
       });
       if (res.ok) {
@@ -558,7 +608,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       const res = await fetch(`/api/main-tours/${encodeURIComponent(tourWithTimestamp.id)}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAdminHeaders(),
         body: JSON.stringify(tourWithTimestamp)
       });
       if (res.ok) {
@@ -586,7 +636,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     try {
       const res = await fetch(`/api/main-tours/${encodeURIComponent(id)}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: getAdminHeaders()
       });
       if (!res.ok) {
         console.error('Failed to delete tour from server database:', await res.text());
@@ -825,6 +876,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         comingSoonService,
         setComingSoonService,
         bookings,
+        refreshBookings,
         addBooking,
         updateBookingStatus,
         formatPrice,
