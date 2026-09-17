@@ -96,6 +96,9 @@ export interface Booking {
   paymentId?: string;
   paidAt?: string;
   totalPriceIDR?: number;
+  baseAmount?: number;
+  uniqueCode?: number;
+  paymentAmount?: number;
   customerName?: string;
   customerEmail?: string;
   customerPhone?: string;

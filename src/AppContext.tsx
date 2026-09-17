@@ -133,12 +133,15 @@ if (typeof window !== 'undefined' && localStorage.getItem(CLEAN_STATE_KEY) !== '
 
 function getAdminHeaders(): Record<string, string> {
   const token = typeof window !== 'undefined'
-    ? (localStorage.getItem('smart_journey_admin_token') || localStorage.getItem('smartjourney_admin_token') || 'admin-smart-journey-token')
-    : 'admin-smart-journey-token';
-  return {
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${token}`
+    ? (localStorage.getItem('smart_journey_admin_token') || localStorage.getItem('smartjourney_admin_token') || '')
+    : '';
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json'
   };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  return headers;
 }
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -537,11 +540,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       const payload: any = { status };
       if (paymentStatus !== undefined) payload.paymentStatus = paymentStatus;
-      const res = await fetch(`/api/bookings/${encodeURIComponent(id)}`, {
-        method: 'PUT',
+      let res = await fetch(`/api/bookings/${encodeURIComponent(id)}/status`, {
+        method: 'PATCH',
         headers: getAdminHeaders(),
         body: JSON.stringify(payload)
       });
+      if (!res.ok) {
+        // Fallback to PUT /api/bookings/:id if needed
+        res = await fetch(`/api/bookings/${encodeURIComponent(id)}`, {
+          method: 'PUT',
+          headers: getAdminHeaders(),
+          body: JSON.stringify(payload)
+        });
+      }
       if (res.ok) {
         const serverUpdated = await res.json();
         setBookings(prev => prev.map(b => (b.id === serverUpdated.id || b.bookingCode === serverUpdated.bookingCode) ? { ...b, ...serverUpdated } : b));

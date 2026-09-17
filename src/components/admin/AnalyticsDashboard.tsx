@@ -144,19 +144,19 @@ export default function AnalyticsDashboard({ isDark = true }: AnalyticsDashboard
 
     try {
       const token = localStorage.getItem('smart_journey_admin_token') || 
-                    localStorage.getItem('smartjourney_admin_token') || 
-                    'admin-smart-journey-token';
+                    localStorage.getItem('smartjourney_admin_token') || '';
 
       let queryUrl = `/api/analytics/dashboard?range=${dateRange}`;
       if (dateRange === 'custom' && customStartDate && customEndDate) {
         queryUrl += `&startDate=${customStartDate}&endDate=${customEndDate}`;
       }
 
-      const res = await fetch(queryUrl, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
+      const headers: Record<string, string> = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const res = await fetch(queryUrl, { headers });
 
       if (!res.ok) {
         if (res.status === 401) {

@@ -99,6 +99,9 @@ export interface Booking {
   };
   totalPrice: number;
   totalPriceIDR: number;
+  baseAmount?: number;
+  uniqueCode?: number;
+  paymentAmount?: number;
   customerName: string;
   customerEmail: string;
   customerPhone: string;

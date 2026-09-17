@@ -656,28 +656,18 @@ export default function AdminView() {
       });
       if (res.ok) {
         const data = await res.json();
-        setIsAdminUnlocked(true);
-        localStorage.setItem('smartjourney_admin_unlocked', 'true');
-        if (data.token) {
+        if (data.success && data.token) {
+          setIsAdminUnlocked(true);
+          localStorage.setItem('smartjourney_admin_unlocked', 'true');
           localStorage.setItem('smart_journey_admin_token', data.token);
           localStorage.setItem('smartjourney_admin_token', data.token);
+          setPasswordError(false);
+          triggerToast('Akses Admin Berhasil Dibuka');
+          return;
         }
-        setPasswordError(false);
-        triggerToast('Akses Admin Berhasil Dibuka');
-        return;
       }
+      setPasswordError(true);
     } catch {
-      // Fallback check if API is unreachable
-    }
-
-    if (rolePasswordInput === 'sawahjaya2026' || rolePasswordInput === 'smartjourney2026') {
-      setIsAdminUnlocked(true);
-      localStorage.setItem('smartjourney_admin_unlocked', 'true');
-      localStorage.setItem('smart_journey_admin_token', 'admin-smart-journey-token');
-      localStorage.setItem('smartjourney_admin_token', 'admin-smart-journey-token');
-      setPasswordError(false);
-      triggerToast('Akses Admin Berhasil Dibuka');
-    } else {
       setPasswordError(true);
     }
   };
@@ -685,6 +675,8 @@ export default function AdminView() {
   const handleLogout = () => {
     setIsAdminUnlocked(false);
     localStorage.removeItem('smartjourney_admin_unlocked');
+    localStorage.removeItem('smart_journey_admin_token');
+    localStorage.removeItem('smartjourney_admin_token');
     triggerToast('Anda telah keluar dari Portal Admin');
   };
 

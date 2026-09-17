@@ -34,7 +34,7 @@ export default function BookingsView() {
 
   // Poll server payment status for pending bookings to ensure sync with ArtoPay Webhook
   useEffect(() => {
-    const pendingItems = localBookings.filter(b => b.paymentStatus === 'Pending' || b.paymentStatus === 'Unpaid');
+    const pendingItems = localBookings.filter(b => b.paymentStatus === 'Pending' || b.paymentStatus === 'Unpaid' || b.paymentStatus === 'Pending Payment');
     if (pendingItems.length === 0) return;
 
     let isMounted = true;
@@ -45,14 +45,36 @@ export default function BookingsView() {
 
       for (const b of pendingItems) {
         try {
-          const res = await fetch(`/api/orders/${b.id}/payment-status`);
+          const res = await fetch(`/api/orders/${encodeURIComponent(b.id)}/payment-status`);
           if (res.ok) {
             const data = await res.json();
-            if (data.found && data.paymentStatus === 'Paid') {
+            if (data.found) {
               const idx = nextBookings.findIndex(item => item.id === b.id);
               if (idx !== -1) {
-                nextBookings[idx] = { ...nextBookings[idx], paymentStatus: 'Paid', status: 'Confirmed' };
-                hasChanges = true;
+                const serverPaymentStatus = data.paymentStatus || nextBookings[idx].paymentStatus;
+                const serverBookingStatus = data.bookingStatus || data.orderStatus || data.booking?.status || nextBookings[idx].status;
+                const serverPaymentAmount = data.paymentAmount || nextBookings[idx].paymentAmount;
+                const serverUniqueCode = data.uniqueCode || nextBookings[idx].uniqueCode;
+                const serverBaseAmount = data.baseAmount || nextBookings[idx].baseAmount;
+
+                if (
+                  nextBookings[idx].paymentStatus !== serverPaymentStatus ||
+                  nextBookings[idx].status !== serverBookingStatus ||
+                  nextBookings[idx].paymentAmount !== serverPaymentAmount
+                ) {
+                  // REQUIREMENT 3: Frontend customer HANYA membaca status apa adanya dari backend
+                  // TIDAK BOLEH auto-confirm menjadi 'Confirmed' di browser customer!
+                  nextBookings[idx] = { 
+                    ...nextBookings[idx], 
+                    paymentStatus: serverPaymentStatus, 
+                    status: serverBookingStatus,
+                    baseAmount: serverBaseAmount,
+                    uniqueCode: serverUniqueCode,
+                    paymentAmount: serverPaymentAmount,
+                    paidAt: data.paidAt || nextBookings[idx].paidAt
+                  };
+                  hasChanges = true;
+                }
               }
             }
           }
@@ -105,10 +127,24 @@ export default function BookingsView() {
     window.open(`https://wa.me/6285212347289?text=${encoded}`, '_blank', 'noreferrer,noopener');
   };
 
-  const updateBookingPaymentStatus = (id: string, status: 'Paid' | 'Pending' | 'Unpaid') => {
+  const updateBookingPaymentStatus = (
+    id: string, 
+    status: string, 
+    bookingStatus?: string,
+    paymentAmount?: number,
+    uniqueCode?: number,
+    baseAmount?: number
+  ) => {
     const updated = localBookings.map(b => {
       if (b.id === id) {
-        return { ...b, paymentStatus: status };
+        return { 
+          ...b, 
+          paymentStatus: status,
+          ...(bookingStatus ? { status: bookingStatus } : {}),
+          ...(paymentAmount ? { paymentAmount } : {}),
+          ...(uniqueCode ? { uniqueCode } : {}),
+          ...(baseAmount ? { baseAmount } : {})
+        };
       }
       return b;
     });
@@ -120,17 +156,25 @@ export default function BookingsView() {
   const handlePayWithArtoPay = async (booking: any) => {
     setPaymentLoadingId(booking.id);
     try {
+      const payableAmount = booking.paymentAmount || (booking.uniqueCode ? (booking.totalPriceIDR + booking.uniqueCode) : booking.totalPriceIDR);
       await processArtoPayPayment({
         orderId: booking.id,
-        amount: booking.totalPriceIDR,
+        amount: payableAmount,
         currency: 'IDR',
         onSuccess: async (res) => {
           try {
-            const check = await fetch(`/api/orders/${booking.id}/payment-status`);
+            const check = await fetch(`/api/orders/${encodeURIComponent(booking.id)}/payment-status`);
             if (check.ok) {
               const data = await check.json();
-              if (data.found && data.paymentStatus === 'Paid') {
-                updateBookingPaymentStatus(booking.id, 'Paid');
+              if (data.found) {
+                updateBookingPaymentStatus(
+                  booking.id, 
+                  data.paymentStatus || 'Paid', 
+                  data.bookingStatus || data.orderStatus,
+                  data.paymentAmount,
+                  data.uniqueCode,
+                  data.baseAmount
+                );
               }
             }
           } catch (e) {
@@ -139,11 +183,18 @@ export default function BookingsView() {
         },
         onPending: async (res) => {
           try {
-            const check = await fetch(`/api/orders/${booking.id}/payment-status`);
+            const check = await fetch(`/api/orders/${encodeURIComponent(booking.id)}/payment-status`);
             if (check.ok) {
               const data = await check.json();
               if (data.found) {
-                updateBookingPaymentStatus(booking.id, data.paymentStatus || 'Pending');
+                updateBookingPaymentStatus(
+                  booking.id, 
+                  data.paymentStatus || 'Pending', 
+                  data.bookingStatus || data.orderStatus,
+                  data.paymentAmount,
+                  data.uniqueCode,
+                  data.baseAmount
+                );
               }
             }
           } catch (e) {
@@ -393,10 +444,18 @@ export default function BookingsView() {
                     </div>
 
                     <div className="space-y-1">
-                      <span className="text-[10px] text-neutral-500 block uppercase font-mono tracking-wider">TICKET PRICE</span>
+                      <span className="text-[10px] text-neutral-500 block uppercase font-mono tracking-wider">TOTAL TAGIHAN</span>
                       <span className="text-lg font-black text-amber-400 block leading-tight">
-                        {formatPrice(booking.totalPrice, booking.totalPriceIDR)}
+                        {booking.paymentAmount 
+                          ? `Rp ${booking.paymentAmount.toLocaleString('id-ID')}`
+                          : formatPrice(booking.totalPrice, booking.totalPriceIDR)}
                       </span>
+                      {booking.uniqueCode ? (
+                        <div className="text-[9px] font-mono text-neutral-400 pt-0.5">
+                          <span>Dasar: Rp {(booking.baseAmount || booking.totalPriceIDR).toLocaleString('id-ID')}</span>
+                          <span className="text-amber-400 font-bold ml-1">+ Kode: {booking.uniqueCode}</span>
+                        </div>
+                      ) : null}
                       
                       {/* Interactive payment badge under price */}
                       <span className={`inline-block text-[9px] font-mono uppercase tracking-wider px-2 py-0.5 rounded-md mt-1 border ${

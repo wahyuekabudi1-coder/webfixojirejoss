@@ -28,11 +28,14 @@ export function recalculateBatchSeats(db: DatabaseState): DatabaseState {
 }
 
 function getAuthHeaders(): Record<string, string> {
-  const token = localStorage.getItem("smart_journey_admin_token") || localStorage.getItem("smartjourney_admin_token") || "admin-smart-journey-token";
-  return {
-    "Content-Type": "application/json",
-    "Authorization": `Bearer ${token}`
+  const token = localStorage.getItem("smart_journey_admin_token") || localStorage.getItem("smartjourney_admin_token") || "";
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json"
   };
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+  return headers;
 }
 
 export async function fetchDB(retries = 3, initialDelayMs = 1000, signal?: AbortSignal): Promise<DatabaseState> {
